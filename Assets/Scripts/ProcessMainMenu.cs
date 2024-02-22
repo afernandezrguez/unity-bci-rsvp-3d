@@ -1,60 +1,59 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Diagnostics;
-using System;
 
 public class ProcessMainMenu : MonoBehaviour
 {
-    [SerializeField] private Button condition1Button, condition2Button, condition3Button, quitButton;
+    [SerializeField] private Button[] conditionButtons;
+    [SerializeField] private Button quitButton;
     [SerializeField] private Button setConfigButton;
+    [SerializeField] private GameObject participantCodeInput;
 
-    public GameObject ParticipantCodeInput;
     private string participantCode;
 
     private void Start()
     {
-        ParticipantCodeInput.GetComponent<InputField>().text = "00";
+        participantCodeInput.GetComponent<InputField>().text = PlayerPrefs.GetString("ParticipantCode");
 
-        condition1Button.onClick.AddListener(CreateProcessCondition1);
-        condition2Button.onClick.AddListener(CreateProcessCondition2);
-        condition3Button.onClick.AddListener(CreateProcessCondition3);
+        foreach (Button button in conditionButtons)
+        {
+            button.onClick.AddListener(() => CreateProcessCondition(button));
+        }
+
         setConfigButton.onClick.AddListener(CreateProcessSetConfig);
-        quitButton.onClick.AddListener(exitApplication);
+        quitButton.onClick.AddListener(ExitApplication);
     }
 
-    private void CreateProcessCondition1()
+    private void Update()
     {
-        string workingDirectory = "C:\\BCI2000_v3_6\\batch\\rsvp_unity";
-        string command = "/C start signalGenerator_c1.bat";
-        CreateProcess(workingDirectory, command);
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            ExitApplication();
+        }
     }
 
-    private void CreateProcessCondition2()
+    private void CreateProcessCondition(Button button)
     {
-        string workingDirectory = "C:\\BCI2000_v3_6\\batch\\rsvp_unity";
-        string command = "/C start signalGenerator_c2.bat";
-        CreateProcess(workingDirectory, command);
-    }
-
-    private void CreateProcessCondition3()
-    {
-        string workingDirectory = "C:\\BCI2000_v3_6\\batch\\rsvp_unity";
-        string command = "/C start signalGenerator_c3.bat";
-        CreateProcess(workingDirectory, command);
+        CloseBCI2000();
+        CloseAllCmdWindows();
+        string condition = button.name.Replace("Condition ", "");
+        string workingDirectory = "C:/BCI2000_v3_6/batch/rsvp_unity";
+        string command = $"/C start signalGenerator_c{condition}.bat";
+        ExecuteCommand(workingDirectory, command);
     }
 
     private void CreateProcessSetConfig()
     {
-        ActualizarParticipantCode();
-
-        string workingDirectory = "C:\\BCI2000_v3_6\\prog";
-        //string command = "/C BCI2000Command SetConfig";
-        string command = "/C BCI2000Command SetParameter SubjectName " + participantCode + " && BCI2000Command SetConfig";
-        CreateProcess(workingDirectory, command);
+        UpdateParticipantCode();
+        SaveParticipantCode();
+        string workingDirectory = "C:/BCI2000_v3_6/prog";
+        string command = $"/C BCI2000Command SetParameter SubjectName {participantCode} && BCI2000Command SetConfig";
+        ExecuteCommand(workingDirectory, command);
     }
-    private void CreateProcess(string workingDirectory, string command)
+
+    private void ExecuteCommand(string workingDirectory, string command)
     {
-        var processInfo = new ProcessStartInfo
+        ProcessStartInfo processInfo = new ProcessStartInfo
         {
             WorkingDirectory = workingDirectory,
             WindowStyle = ProcessWindowStyle.Hidden,
@@ -64,26 +63,40 @@ public class ProcessMainMenu : MonoBehaviour
             RedirectStandardOutput = false,
             Arguments = command
         };
-        var process = Process.Start(processInfo);
+
+        Process process = Process.Start(processInfo);
         process.WaitForExit();
     }
 
-    private void Update()
+    public void UpdateParticipantCode()
     {
-        if (Input.GetKey("escape"))
+        participantCode = participantCodeInput.GetComponent<InputField>().text;
+    }
+
+    public void SaveParticipantCode()
+    {
+        PlayerPrefs.SetString("ParticipantCode", participantCodeInput.GetComponent<InputField>().text);
+        PlayerPrefs.Save();
+    }
+
+    private void CloseBCI2000()
+    {
+        string workingDirectory = "C:/BCI2000_v3_6/prog";
+        string command = "/C BCI2000Command Quit";
+        ExecuteCommand(workingDirectory, command);
+    }
+
+    private void CloseAllCmdWindows()
+    {
+        Process[] processes = Process.GetProcessesByName("cmd");
+        foreach (Process process in processes)
         {
-            exitApplication();
+            process.Kill();
         }
     }
 
-    void exitApplication()
+    private void ExitApplication()
     {
         Application.Quit();
-    }
-
-    public void ActualizarParticipantCode()
-    {
-        // Obtener el valor introducido por el usuario desde el campo de texto
-        participantCode = ParticipantCodeInput.GetComponent<InputField>().text;
     }
 }

@@ -40,7 +40,7 @@ public class UDPController : MonoBehaviour
 
     void Update()
     {
-        startButton.onClick.AddListener(LimpiarPantalla);
+        startButton.onClick.AddListener(CleanScreen);
         returnButton.onClick.AddListener(OnDestroy);
 
         if (stimulusPresented)
@@ -54,7 +54,7 @@ public class UDPController : MonoBehaviour
         }
         else
         {
-            DesactivarStimulus();
+            DeactivateStimulus();
         }
 
         if (showNextTarget)
@@ -71,7 +71,7 @@ public class UDPController : MonoBehaviour
                 }
 
             }
-            Invoke("DesactivarStimulusTarget", 1.0f);
+            Invoke(nameof(DeactivateStimulusTarget), 1.0f);
         }
 
         if (blockCompleted)
@@ -196,7 +196,7 @@ public class UDPController : MonoBehaviour
         udpClient.BeginReceive(ReceiveCallback, null);         // Continúa escuchando para más datos
     }
 
-    void LimpiarPantalla()
+    void CleanScreen()
     {
         blockCompleted = false;
         StartButton.SetActive(false);
@@ -204,12 +204,12 @@ public class UDPController : MonoBehaviour
         ReturnButton.SetActive(false);
     }
 
-    void DesactivarStimulusTarget()
+    void DeactivateStimulusTarget()
     {
         showNextTarget = false;
     }
 
-    void DesactivarStimulus()
+    void DeactivateStimulus()
     {
         foreach (GameObject stimulus in stimuliArray)
         {
