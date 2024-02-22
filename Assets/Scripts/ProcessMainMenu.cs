@@ -1,14 +1,20 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Diagnostics;
+using System;
 
 public class ProcessMainMenu : MonoBehaviour
 {
     [SerializeField] private Button condition1Button, condition2Button, condition3Button, quitButton;
     [SerializeField] private Button setConfigButton;
 
+    public GameObject ParticipantCodeInput;
+    private string participantCode;
+
     private void Start()
     {
+        ParticipantCodeInput.GetComponent<InputField>().text = "00";
+
         condition1Button.onClick.AddListener(CreateProcessCondition1);
         condition2Button.onClick.AddListener(CreateProcessCondition2);
         condition3Button.onClick.AddListener(CreateProcessCondition3);
@@ -39,8 +45,11 @@ public class ProcessMainMenu : MonoBehaviour
 
     private void CreateProcessSetConfig()
     {
+        ActualizarParticipantCode();
+
         string workingDirectory = "C:\\BCI2000_v3_6\\prog";
-        string command = "/C BCI2000Command SetConfig";
+        //string command = "/C BCI2000Command SetConfig";
+        string command = "/C BCI2000Command SetParameter SubjectName " + participantCode + " && BCI2000Command SetConfig";
         CreateProcess(workingDirectory, command);
     }
     private void CreateProcess(string workingDirectory, string command)
@@ -70,5 +79,11 @@ public class ProcessMainMenu : MonoBehaviour
     void exitApplication()
     {
         Application.Quit();
+    }
+
+    public void ActualizarParticipantCode()
+    {
+        // Obtener el valor introducido por el usuario desde el campo de texto
+        participantCode = ParticipantCodeInput.GetComponent<InputField>().text;
     }
 }
