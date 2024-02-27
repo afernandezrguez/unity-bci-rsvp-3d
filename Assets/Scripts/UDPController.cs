@@ -6,6 +6,7 @@ using System.Text;
 using System;
 using UnityEngine.SceneManagement;
 using System.Diagnostics;
+using Debug = UnityEngine.Debug;
 
 public class UDPController : MonoBehaviour
 {
@@ -152,19 +153,24 @@ public class UDPController : MonoBehaviour
         byte[] bytes = udpClient.EndReceive(ar, ref ip);
         string message = Encoding.ASCII.GetString(bytes);
 
-        string stimulusNumberString = message.Substring(3, 2);
+        //string stimulusNumberString = message.Substring(3, 2);
+        string stimulusNumberString = message.Substring(12, 2);
+
         stimulusNumberInt = int.Parse(stimulusNumberString);
 
         string phaseInSequenceString = message.Substring(message.Length - 4);
         phaseInSequenceInt = int.Parse(phaseInSequenceString);
 
-        //Debug.Log("Array de bytes: " + message);
-        //Debug.Log("stimulusCodeInt: " + stimulusCodeInt);
-        //Debug.Log("phaseInSequenceInt: " + phaseInSequenceInt);
+        Debug.Log("Array de bytes: " + message);
+        Debug.Log("stimulusNumberInt: " + stimulusNumberInt);
+        Debug.Log("phaseInSequenceInt: " + phaseInSequenceInt);
+
+
+
 
         if (stimulusNumberInt != 0)
         {
-            //stimulusNumberInt = 1; // para testear la velocidad de presentación
+            //stimulusNumberInt = 1; // para testear la velocidad de presentaciï¿½n
             stimulusPresented = true;
         }
         else if (stimulusNumberInt == 0 && phaseInSequenceInt == 2)
@@ -193,7 +199,7 @@ public class UDPController : MonoBehaviour
                 }
                 break;
         }
-        udpClient.BeginReceive(ReceiveCallback, null);         // Continúa escuchando para más datos
+        udpClient.BeginReceive(ReceiveCallback, null);         // Continï¿½a escuchando para mï¿½s datos
     }
 
     void CleanScreen()
