@@ -1,59 +1,120 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Diagnostics;
+using Debug = UnityEngine.Debug;
+using System;
 
 public class ProcessMainMenu : MonoBehaviour
 {
-    [SerializeField] private Button[] conditionButtons;
-    [SerializeField] private Button quitButton;
-    [SerializeField] private Button setConfigButton;
-    [SerializeField] private GameObject participantCodeInput;
+    [SerializeField] private Button[] signalButtons;
+    [SerializeField] private Button signal1Button, signal2Button;
+    [SerializeField] private Button participantButton, quitButton, setConfigButton;
+    [SerializeField] private GameObject participantNumber;
+    [SerializeField] private Toggle feedbackToggle;
+    [SerializeField] private Toggle condition1Toggle, condition2Toggle;
 
-    private string participantCode;
+    // [SerializeField] private GameObject rightHandController;
+
+    public VirtualKeyboard virtualKeyboard;
+    public SequenceController sequenceController;
+
+    public bool feedbackMode, testingMode;
+    private string participantCode, numberOfSequences, conditionSelected;
+
+    private const string BCI2000Directory = "C:/BCI2000_v3_6";
+    //private const string BCI2000Directory = "C:\\BCI2000\\BCI2000 v3.6.beta.R7385\\BCI2000.x64\\prog";
 
     private void Start()
     {
-        participantCodeInput.GetComponent<InputField>().text = PlayerPrefs.GetString("ParticipantCode");
+        InitializeMenu();
+        CloseBCI2000();
+        CloseAllCmdWindows();
+    }
 
-        foreach (Button button in conditionButtons)
-        {
-            button.onClick.AddListener(() => CreateProcessCondition(button));
-        }
-
+    private void InitializeMenu()
+    {
+        condition1Toggle.onValueChanged.AddListener((isOn) => OnToggleChanged());
+        condition2Toggle.onValueChanged.AddListener((isOn) => OnToggleChanged());
+        signal1Button.onClick.AddListener(ActionForSignal1);
+        signal2Button.onClick.AddListener(ActionForSignal2);
+        participantButton.onClick.AddListener(OpenParticipantPanel);
         setConfigButton.onClick.AddListener(CreateProcessSetConfig);
         quitButton.onClick.AddListener(ExitApplication);
     }
 
-    private void Update()
+    private void OnToggleChanged()
     {
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            ExitApplication();
-        }
+        conditionSelected = condition1Toggle.isOn ? "1" : condition2Toggle.isOn ? "2" : null;
     }
 
-    private void CreateProcessCondition(Button button)
+    private void OpenParticipantPanel()
+    {
+        participantNumber.GetComponent<Text>().text = string.Empty;
+        virtualKeyboard.participantNumber = string.Empty;
+    }
+
+    private void ActionForSignal1()
+    {
+        StartBCI2000Process("signalGenerator_rsvp_vr.bat", true);
+    }
+
+    private void ActionForSignal2()
+    {
+        StartBCI2000Process("actichamp_rsvp_vr.bat", false);
+    }
+
+    private void StartBCI2000Process(string batchFileName, bool isTesting)
     {
         CloseBCI2000();
         CloseAllCmdWindows();
-        string condition = button.name.Replace("Condition ", "");
-        string workingDirectory = "C:/BCI2000_v3_6/batch/rsvp_unity";
-        string command = $"/C start signalGenerator_c{condition}.bat";
+        string workingDirectory = $"{BCI2000Directory}/batch/rsvp_vr";
+        string command = $"/C start {batchFileName}";
         ExecuteCommand(workingDirectory, command);
+        testingMode = isTesting;
     }
 
     private void CreateProcessSetConfig()
     {
-        UpdateParticipantCode();
-        SaveParticipantCode();
-        string workingDirectory = "C:/BCI2000_v3_6/prog";
-        string command = $"/C BCI2000Command SetParameter SubjectName {participantCode} && BCI2000Command SetConfig";
-        ExecuteCommand(workingDirectory, command);
+        participantCode = testingMode ? "RV_Test" : $"RV{virtualKeyboard.participantNumber}";
+        numberOfSequences = sequenceController.currentNumber.ToString();
+
+        string workingDirectory = $"{BCI2000Directory}/prog";
+        string displayResults = feedbackToggle.isOn ? "1" : "0";
+        feedbackMode = feedbackToggle.isOn;
+
+        // Comandos individuales
+        string commandSubjectName = $"/C BCI2000Command SetParameter SubjectName {participantCode}";
+        string commandSubjectSession = $"/C BCI2000Command SetParameter SubjectSession {conditionSelected}";
+        string commandNumberOfSequences = $"/C BCI2000Command SetParameter NumberOfSequences {numberOfSequences}";
+
+        string commandEpochsToAverage = $"/C BCI2000Command SetParameter EpochsToAverage {numberOfSequences}";
+
+        string commandDisplayResults = $"/C BCI2000Command SetParameter DisplayResults {displayResults}";
+        string commandSetConfig = $"/C BCI2000Command SetConfig";
+
+        // Ejecutar cada comando individualmente
+        ExecuteCommand(workingDirectory, commandSubjectName);
+        ExecuteCommand(workingDirectory, commandSubjectSession);
+        ExecuteCommand(workingDirectory, commandNumberOfSequences);
+
+        ExecuteCommand(workingDirectory, commandEpochsToAverage);
+
+        ExecuteCommand(workingDirectory, commandDisplayResults);
+        ExecuteCommand(workingDirectory, commandSetConfig);
+
+        //if (conditionSelected == "1")
+        //{
+        //    rightHandController.SetActive(false);
+        //}
+        //else if (conditionSelected == "2")
+        //{
+        //    rightHandController.SetActive(true);
+        //}
     }
 
     private void ExecuteCommand(string workingDirectory, string command)
     {
-        ProcessStartInfo processInfo = new ProcessStartInfo
+        var processInfo = new ProcessStartInfo
         {
             WorkingDirectory = workingDirectory,
             WindowStyle = ProcessWindowStyle.Hidden,
@@ -64,32 +125,21 @@ public class ProcessMainMenu : MonoBehaviour
             Arguments = command
         };
 
-        Process process = Process.Start(processInfo);
-        process.WaitForExit();
-    }
-
-    public void UpdateParticipantCode()
-    {
-        participantCode = participantCodeInput.GetComponent<InputField>().text;
-    }
-
-    public void SaveParticipantCode()
-    {
-        PlayerPrefs.SetString("ParticipantCode", participantCodeInput.GetComponent<InputField>().text);
-        PlayerPrefs.Save();
+        using (Process process = Process.Start(processInfo))
+        {
+            process.WaitForExit();
+        }
     }
 
     private void CloseBCI2000()
     {
-        string workingDirectory = "C:/BCI2000_v3_6/prog";
-        string command = "/C BCI2000Command Quit";
-        ExecuteCommand(workingDirectory, command);
+        string workingDirectory = $"{BCI2000Directory}/prog";
+        ExecuteCommand(workingDirectory, "/C BCI2000Command Quit");
     }
 
     private void CloseAllCmdWindows()
     {
-        Process[] processes = Process.GetProcessesByName("cmd");
-        foreach (Process process in processes)
+        foreach (Process process in Process.GetProcessesByName("cmd"))
         {
             process.Kill();
         }

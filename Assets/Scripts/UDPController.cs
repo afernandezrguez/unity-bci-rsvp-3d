@@ -6,42 +6,87 @@ using System.Text;
 using System;
 using UnityEngine.SceneManagement;
 using System.Diagnostics;
+using Debug = UnityEngine.Debug;
 
 public class UDPController : MonoBehaviour
 {
     [SerializeField] private Button startButton;
+    [SerializeField] private Button stopButton;
     [SerializeField] private Button returnButton;
+    [SerializeField] private Button setConfigButton;
     private UdpClient udpClient;
-    private int stimulusNumberInt, phaseInSequenceInt;
-    private Boolean stimulusPresented, showNextTarget, blockCompleted, allowFinishing;
+    private int stimulusNumberInt, phaseInSequenceInt, selectedStimulusInt;
+    private Boolean trialRun, stimulusPresented, allowNextTarget, showNextTarget, selectedStimulusPresented, blockCompleted, allowFinishing;
+    private Boolean feedbackModeUDP;
+    public ProcessMainMenu feedbackMode;
     private GameObject[] stimuliArray;
-    public GameObject StartButton, ReturnButton, BlockCompleted;
-    private AudioSource playerAudio;
-    public AudioClip jumpSound;
+
+    private GameObject[] stimuliRememberArray;
+
+    public GameObject BackgroundRun, StartButton, StopButton, ReturnButton, BlockCompleted, ErrorAlert;
+    public GameObject HappyFace, SadFace;
+    public GameObject Canvas_bci_run, Canvas_bci_participant;
+    public GameObject FocusOnText, SelectedStimulusText;
+    //public GameObject leftHandController, rightHandController;
+    public AudioClip focusOnSound;
+    private AudioSource audioSource;
+
+    public LineRenderer lineRenderer;       // Referencia al rayo rojo (LineRenderer)
+    public MeshRenderer controllerMesh;     // Referencia al modelo del controlador (MeshRenderer)
 
     private readonly int port = 12345;
-    private readonly int[] stimulusTargetOrder = { 1, 2 };      // El "ToBeCopied" de BCI2000.
+    private readonly int[] stimulusTargetOrder = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };      // El "ToBeCopied" de BCI2000.
     private readonly int numberOfCommands = 10;
-    
     private int trial = 0;
     private bool resetTrial = true;
+    //private float startTime = 0f;
+    //private float timer;
+    private DateTime startTime;
 
     void Start()
     {
-        startButton.onClick.AddListener(CreateProcessStart);
-        returnButton.onClick.AddListener(CreateProcessReturn);
+        OnDestroy();
+        Canvas_bci_run.SetActive(false);
+        Canvas_bci_participant.SetActive(false);
+        FocusOnText.SetActive(false);
+        SelectedStimulusText.SetActive(false);
+        HappyFace.SetActive(false);
+        SadFace.SetActive(false);
+        ErrorAlert.SetActive(false);
         stimuliArray = new GameObject[numberOfCommands];
-        udpClient = new UdpClient(port);
-        udpClient.BeginReceive(ReceiveCallback, null);
-        BlockCompleted.SetActive(false);
         InitializeStimuliArray();
-        playerAudio = GetComponent<AudioSource>();
+
+        stimuliRememberArray = new GameObject[numberOfCommands];
+        InitializeStimuliRememberArray();
+
+        audioSource = GetComponent<AudioSource>();
+        audioSource.clip = focusOnSound;
+
+        startButton.onClick.AddListener(StartRun);
+        stopButton.onClick.AddListener(StopRun);
+        returnButton.onClick.AddListener(ReturnMainMenu);
+        setConfigButton.onClick.AddListener(OpenRunMenu);
+
+        startTime = DateTime.Now;
     }
 
     void Update()
     {
-        startButton.onClick.AddListener(CleanScreen);
-        returnButton.onClick.AddListener(OnDestroy);
+        if (trialRun)
+        {
+            int targetStimulusR = stimulusTargetOrder[trial];
+            if (targetStimulusR >= 1 && targetStimulusR <= numberOfCommands)
+            {
+                stimuliRememberArray[targetStimulusR - 1].SetActive(true);
+            }
+        }
+        else
+        {
+            foreach (GameObject stimulusR in stimuliRememberArray)
+            {
+                stimulusR.SetActive(false);
+            }
+        }
 
         if (stimulusPresented)
         {
@@ -63,49 +108,111 @@ public class UDPController : MonoBehaviour
             if (targetStimulus >= 1 && targetStimulus <= numberOfCommands)
             {
                 stimuliArray[targetStimulus - 1].SetActive(true);
-
+                FocusOnText.SetActive(true);
                 if (resetTrial)
                 {
-                    playerAudio.PlayOneShot(jumpSound, 1.0f);
+                    audioSource.PlayOneShot(focusOnSound, 1.0f);
                     resetTrial = false;
                 }
-
             }
             Invoke(nameof(DeactivateStimulusTarget), 1.0f);
         }
 
+        if (selectedStimulusPresented)
+        {
+            stimuliArray[selectedStimulusInt - 1].SetActive(true);
+
+            if (selectedStimulusInt == stimulusTargetOrder[trial - 1])
+            {
+                HappyFace.SetActive(true);
+            }
+            else
+            {
+                SadFace.SetActive(true);
+            }
+
+            SelectedStimulusText.SetActive(true);
+            Invoke(nameof(DeactivateSelectedStimulus), 1.0f);
+        }
+
         if (blockCompleted)
         {
+            Canvas_bci_run.SetActive(true);
+            StopButton.SetActive(false);
+            BackgroundRun.SetActive(true);
             StartButton.SetActive(true);
             BlockCompleted.SetActive(true);
             ReturnButton.SetActive(true);
+            stimulusPresented = false;
             resetTrial = true;
         }
 
-        if (Input.GetKey(KeyCode.Backspace))
+        if (phaseInSequenceInt == 1 && trialRun)
         {
-            string workingDirectory = "C:\\BCI2000_v3_6\\prog";
-            string command = "/C BCI2000Command Stop";
-            CreateProcess(workingDirectory, command);
-            stimulusPresented = false;
-            blockCompleted = true;
-        }
+            // Calcula el tiempo transcurrido en segundos
+            double elapsedSeconds = (DateTime.Now - startTime).TotalSeconds;
 
-        if (Input.GetKey(KeyCode.Escape))
+            // Verificar si el contador ha llegado a 3 segundos
+            if (elapsedSeconds >= 3.2f)
+            {
+                Debug.Log("¡Han pasado más de 3.2 segundos!");
+                ErrorAlert.SetActive(true);
+
+                // Reinicia el temporizador almacenando el tiempo actual
+                startTime = DateTime.Now;
+            }
+        }
+        else
         {
-            Application.Quit();
+            startTime = DateTime.Now;
         }
     }
 
-    private void CreateProcessStart()
+    private void OpenRunMenu()
     {
+        SetupUDPClient();
+        StopButton.SetActive(false);
+        BlockCompleted.SetActive(false);
+        blockCompleted = false;
+    }
+
+    private void SetupUDPClient()
+    {
+        udpClient = new UdpClient(port);
+        udpClient.BeginReceive(ReceiveCallback, null);
+    }
+
+    private void StartRun()
+    {
+        blockCompleted = false;
+        BackgroundRun.SetActive(false);
+        StartButton.SetActive(false);
+        ReturnButton.SetActive(false);
+        BlockCompleted.SetActive(false);
+        StopButton.SetActive(true);
+        feedbackModeUDP = GetComponent<ProcessMainMenu>().feedbackMode;
+
         string workingDirectory = "C:\\BCI2000_v3_6\\prog";
         string command = "/C BCI2000Command Start";
         CreateProcess(workingDirectory, command);
     }
 
-    private void CreateProcessReturn()
+    private void StopRun()
     {
+        trialRun = false;
+        blockCompleted = true;
+        trial = 0;
+        allowFinishing = false;
+
+        string workingDirectory = "C:\\BCI2000_v3_6\\prog";
+        string command = "/C BCI2000Command Stop";
+        CreateProcess(workingDirectory, command);
+    }
+
+    private void ReturnMainMenu()
+    {
+        udpClient?.Close();
+
         string workingDirectory = "C:\\BCI2000_v3_6\\prog";
         string command = "/C BCI2000Command Quit";
         CreateProcess(workingDirectory, command);
@@ -117,15 +224,14 @@ public class UDPController : MonoBehaviour
         var processInfo = new ProcessStartInfo
         {
             WorkingDirectory = workingDirectory,
-            WindowStyle = ProcessWindowStyle.Hidden,
             FileName = "cmd.exe",
+            Arguments = command,
+            WindowStyle = ProcessWindowStyle.Hidden,
             UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = false,
-            Arguments = command
+            CreateNoWindow = true
         };
         var process = Process.Start(processInfo);
-        process.WaitForExit();
+        process?.WaitForExit();
     }
 
     private void CloseAllCmdWindows()
@@ -137,12 +243,22 @@ public class UDPController : MonoBehaviour
         }
     }
 
-    private void InitializeStimuliArray()               // Asigna los GameObjects a los elementos del array
+    private void InitializeStimuliArray()                       // Assigns GameObjects to the array elements
     {
         for (int i = 0; i < numberOfCommands; i++)
         {
-            string stimulusName = "Stimulus" + (i + 1); // Genera el nombre del GameObject
-            stimuliArray[i] = GameObject.Find(stimulusName); // Encuentra el GameObject por su nombre y lo asigna al array
+            string stimulusName = "Stimulus" + (i + 1);         // Generates the name of the GameObject
+            stimuliArray[i] = GameObject.Find(stimulusName);    // Finds the GameObject by its name and assigns it to the array
+        }
+    }
+
+    private void InitializeStimuliRememberArray()                       // Assigns GameObjects to the array elements
+    {
+        for (int i = 0; i < numberOfCommands; i++)
+        {
+            string stimulusName = "StimulusR" + (i + 1);         // Generates the name of the GameObject
+            stimuliRememberArray[i] = GameObject.Find(stimulusName);    // Finds the GameObject by its name and assigns it to the array
+            stimuliRememberArray[i].SetActive(false);
         }
     }
 
@@ -151,62 +267,76 @@ public class UDPController : MonoBehaviour
         IPEndPoint ip = new IPEndPoint(IPAddress.Any, port);
         byte[] bytes = udpClient.EndReceive(ar, ref ip);
         string message = Encoding.ASCII.GetString(bytes);
+        ParseUDPMessage(message);
+        udpClient.BeginReceive(ReceiveCallback, null);
+    }
 
-        string stimulusNumberString = message.Substring(3, 2);
-        stimulusNumberInt = int.Parse(stimulusNumberString);
+    private void ParseUDPMessage(string message)
+    {
+        var messageArray = message.Split('\t');
+        stimulusNumberInt = int.Parse(messageArray[1]);
+        phaseInSequenceInt = int.Parse(messageArray[3]);
+        selectedStimulusInt = int.Parse(messageArray[4]);
+        stimulusPresented = stimulusNumberInt != 0;
+        HandlePhaseSequence();
+    }
 
-        string phaseInSequenceString = message.Substring(message.Length - 4);
-        phaseInSequenceInt = int.Parse(phaseInSequenceString);
-
-        //Debug.Log("Array de bytes: " + message);
-        //Debug.Log("stimulusCodeInt: " + stimulusCodeInt);
-        //Debug.Log("phaseInSequenceInt: " + phaseInSequenceInt);
-
-        if (stimulusNumberInt != 0)
-        {
-            //stimulusNumberInt = 1; // para testear la velocidad de presentación
-            stimulusPresented = true;
-        }
-        else if (stimulusNumberInt == 0 && phaseInSequenceInt == 2)
-        {
-            stimulusPresented = false;
-        }
-
+    private void HandlePhaseSequence()
+    {
         switch (phaseInSequenceInt)
         {
             case 1:
+                trialRun = true;
+                allowNextTarget = true;
                 showNextTarget = true;
                 allowFinishing = true;
+
+                //if (startTime == 0f)
+                //{
+                //    startTime = Time.time; // Guardar el tiempo actual
+                //}
                 break;
             case 2:
                 showNextTarget = false;
+                //if (startTime > 0f) // Si se estaba en la fase 1
+                //{
+                //    float elapsedTime = Time.time - startTime; // Calcular el tiempo transcurrido
+                //    if (elapsedTime > 3.1f)
+                //    {
+                //        Debug.LogWarning("¡El tiempo en la fase 1 ha superado los 3 segundos!");
+                //    }
+                //    startTime = 0f; // Reiniciar el tiempo de inicio
+                //}
                 break;
             case 3:
-                trial++;
-                resetTrial = true;
-                break;
-            case 0:
-                if (allowFinishing)
+                if (allowNextTarget)
                 {
-                    blockCompleted = true;
-                    trial = 0;
+                    trial++;
+                    allowNextTarget = false;
                 }
+                resetTrial = true;
+                trialRun = false;
+                break;
+            case 0 when allowFinishing:
+                blockCompleted = true;
+                trial = 0;
                 break;
         }
-        udpClient.BeginReceive(ReceiveCallback, null);         // Continúa escuchando para más datos
-    }
 
-    void CleanScreen()
-    {
-        blockCompleted = false;
-        StartButton.SetActive(false);
-        BlockCompleted.SetActive(false);
-        ReturnButton.SetActive(false);
+        if (feedbackModeUDP && selectedStimulusInt != 0)
+        {
+            selectedStimulusPresented = true;
+        }
+        else
+        {
+            selectedStimulusPresented = false;
+        }
     }
 
     void DeactivateStimulusTarget()
     {
         showNextTarget = false;
+        FocusOnText.SetActive(false);
     }
 
     void DeactivateStimulus()
@@ -215,22 +345,23 @@ public class UDPController : MonoBehaviour
         {
             stimulus.SetActive(false);
         }
+        HappyFace.SetActive(false);
+        SadFace.SetActive(false);
+    }
+
+    void DeactivateSelectedStimulus()
+    {
+        selectedStimulusPresented = false;
+        SelectedStimulusText.SetActive(false);
     }
 
     void OnDestroy()
     {
-        if (udpClient != null)
-        {
-            udpClient.Close();
-            //Debug.Log("Puerto UDP cerrado");
-        }
+        udpClient?.Close();
     }
 
     void OnApplicationQuit()
     {
-        if (udpClient != null)
-        {
-            udpClient.Close();
-        }
+        udpClient?.Close();
     }
 }
