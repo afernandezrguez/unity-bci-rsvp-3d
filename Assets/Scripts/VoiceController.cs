@@ -9,7 +9,7 @@ using Debug = UnityEngine.Debug;
 
 public class VoiceController : MonoBehaviour
 {
-    [SerializeField] private Button startButton, setConfigButton;
+    [SerializeField] private Button setConfigButton, startButton, stopButton;
     KeywordRecognizer keywordRecognizer;
 
     Dictionary<string, Action> wordToAction;
@@ -17,9 +17,12 @@ public class VoiceController : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        wordToAction = new Dictionary<string, Action>();
-        wordToAction.Add("preparar prueba", ReadyBCI2000);
-        wordToAction.Add("comenzar prueba", StartBCI2000);
+        wordToAction = new Dictionary<string, Action>
+        {
+            { "verde", ReadyBCI2000 },
+            { "morado", StartBCI2000 },
+            { "blanco", StopBCI2000 }
+        };
 
         keywordRecognizer = new KeywordRecognizer(wordToAction.Keys.ToArray());
         keywordRecognizer.OnPhraseRecognized += WordRecognized;
@@ -34,14 +37,19 @@ public class VoiceController : MonoBehaviour
 
     private void ReadyBCI2000()
     {
-        Debug.Log("Has selecionado el comando: PREPARAR");
+        //Debug.Log("Has selecionado el comando: PREPARAR PRUEBA");
         setConfigButton.onClick.Invoke();
     }
 
     private void StartBCI2000()
     {
-        Debug.Log("Has selecionado el comando: COMENZAR");
+        //Debug.Log("Has selecionado el comando: COMENZAR PRUEBA");
         startButton.onClick.Invoke();
     }
 
+    private void StopBCI2000()
+    {
+        //Debug.Log("Has selecionado el comando: DETENER PRUEBA");
+        stopButton.onClick.Invoke();
+    }
 }

@@ -13,16 +13,11 @@ public class ProcessMainMenu : MonoBehaviour
     [SerializeField] private Toggle feedbackToggle;
     [SerializeField] private Toggle condition1Toggle, condition2Toggle;
 
-    // [SerializeField] private GameObject rightHandController;
-
     public VirtualKeyboard virtualKeyboard;
     public SequenceController sequenceController;
-
     public bool feedbackMode, testingMode;
     private string participantCode, numberOfSequences, conditionSelected;
-
     private const string BCI2000Directory = "C:/BCI2000_v3_6";
-    //private const string BCI2000Directory = "C:\\BCI2000\\BCI2000 v3.6.beta.R7385\\BCI2000.x64\\prog";
 
     private void Start()
     {
@@ -55,29 +50,36 @@ public class ProcessMainMenu : MonoBehaviour
 
     private void ActionForSignal1()
     {
-        StartBCI2000Process("signalGenerator_rsvp_vr.bat", true);
+        StartBCI2000Process("signalGenerator.bat", true);
     }
 
     private void ActionForSignal2()
     {
-        StartBCI2000Process("actichamp_rsvp_vr.bat", false);
+        StartBCI2000Process("actichamp.bat", false);
     }
 
     private void StartBCI2000Process(string batchFileName, bool isTesting)
     {
-        CloseBCI2000();
-        CloseAllCmdWindows();
-        string workingDirectory = $"{BCI2000Directory}/batch/rsvp_vr";
-        string command = $"/C start {batchFileName}";
+        //CloseBCI2000();
+        //CloseAllCmdWindows();
+
+        //string workingDirectory = $"{BCI2000Directory}/batch/rsvp_unity_voice";
+        //string command = $"/C start {batchFileName}";
+
+        // Si lo dejo así, no me funciona el comando de voz en el primer menú (i.e., el de setConfig).
+        string workingDirectory = $"{BCI2000Directory}/batch/rsvp_unity_voice";
+        string batchFilePath = $"{workingDirectory}/{batchFileName}";
+        string command = $"/C \"{batchFilePath}\"";  // Sin 'start'
+
         ExecuteCommand(workingDirectory, command);
         testingMode = isTesting;
+        //CloseAllCmdWindows();
     }
 
     private void CreateProcessSetConfig()
     {
-        participantCode = testingMode ? "RV_Test" : $"RV{virtualKeyboard.participantNumber}";
+        participantCode = testingMode ? "test" : $"UV{virtualKeyboard.participantNumber}";
         numberOfSequences = sequenceController.currentNumber.ToString();
-
         string workingDirectory = $"{BCI2000Directory}/prog";
         string displayResults = feedbackToggle.isOn ? "1" : "0";
         feedbackMode = feedbackToggle.isOn;
@@ -86,9 +88,7 @@ public class ProcessMainMenu : MonoBehaviour
         string commandSubjectName = $"/C BCI2000Command SetParameter SubjectName {participantCode}";
         string commandSubjectSession = $"/C BCI2000Command SetParameter SubjectSession {conditionSelected}";
         string commandNumberOfSequences = $"/C BCI2000Command SetParameter NumberOfSequences {numberOfSequences}";
-
         string commandEpochsToAverage = $"/C BCI2000Command SetParameter EpochsToAverage {numberOfSequences}";
-
         string commandDisplayResults = $"/C BCI2000Command SetParameter DisplayResults {displayResults}";
         string commandSetConfig = $"/C BCI2000Command SetConfig";
 
@@ -96,20 +96,10 @@ public class ProcessMainMenu : MonoBehaviour
         ExecuteCommand(workingDirectory, commandSubjectName);
         ExecuteCommand(workingDirectory, commandSubjectSession);
         ExecuteCommand(workingDirectory, commandNumberOfSequences);
-
         ExecuteCommand(workingDirectory, commandEpochsToAverage);
-
         ExecuteCommand(workingDirectory, commandDisplayResults);
         ExecuteCommand(workingDirectory, commandSetConfig);
 
-        //if (conditionSelected == "1")
-        //{
-        //    rightHandController.SetActive(false);
-        //}
-        //else if (conditionSelected == "2")
-        //{
-        //    rightHandController.SetActive(true);
-        //}
     }
 
     private void ExecuteCommand(string workingDirectory, string command)
@@ -125,10 +115,8 @@ public class ProcessMainMenu : MonoBehaviour
             Arguments = command
         };
 
-        using (Process process = Process.Start(processInfo))
-        {
-            process.WaitForExit();
-        }
+        using Process process = Process.Start(processInfo);
+        process.WaitForExit();
     }
 
     private void CloseBCI2000()
