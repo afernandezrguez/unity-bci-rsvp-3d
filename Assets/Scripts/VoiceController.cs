@@ -19,9 +19,9 @@ public class VoiceController : MonoBehaviour
     {
         wordToAction = new Dictionary<string, Action>
         {
-            { "verde", ReadyBCI2000 },
-            { "morado", StartBCI2000 },
-            { "blanco", StopBCI2000 }
+            { "configurar", ReadyBCI2000 },
+            { "comenzar", StartBCI2000 },
+            { "parar", StopBCI2000 }
         };
 
         keywordRecognizer = new KeywordRecognizer(wordToAction.Keys.ToArray());
@@ -39,6 +39,7 @@ public class VoiceController : MonoBehaviour
     {
         //Debug.Log("Has selecionado el comando: PREPARAR PRUEBA");
         setConfigButton.onClick.Invoke();
+        FindObjectOfType<BringToFront>()?.BringUnityToFront();
     }
 
     private void StartBCI2000()

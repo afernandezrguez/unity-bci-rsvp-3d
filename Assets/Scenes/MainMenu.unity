@@ -10187,6 +10187,7 @@ GameObject:
   - component: {fileID: 2103497259}
   - component: {fileID: 2103497262}
   - component: {fileID: 2103497264}
+  - component: {fileID: 2103497265}
   m_Layer: 0
   m_Name: EventSystem
   m_TagString: Untagged
@@ -10469,6 +10470,18 @@ MonoBehaviour:
   setConfigButton: {fileID: 1131798974}
   startButton: {fileID: 842780899}
   stopButton: {fileID: 1875679378}
+--- !u!114 &2103497265
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2103497253}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b61a1bdb0a24574429aedfb2a35a1821, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &2109889596
 GameObject:
   m_ObjectHideFlags: 0
